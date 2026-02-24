@@ -159,9 +159,21 @@ areas.forEach((a,i) => {
 
 function loadArea(idx) {
     const a = areas[idx];
-    const url = `https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=800&height=439&center=lonlat:\( {a.lng}, \){a.lat}&zoom=\( {a.zoom}&apiKey= \){apiKey}`;
-    document.getElementById('map-image').src = url;
-    document.getElementById('message').innerHTML = `Now exploring <strong>${a.name}</strong><br>Click squares to discover different climate bands!`;
+    const url = `https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=800&height=439&center=lonlat:${a.lng},${a.lat}&zoom=${a.zoom}&apiKey=${apiKey}`;
+    
+    const img = document.getElementById('map-image');
+    img.src = url;
+    
+    // Optional: show loading state or error handling
+    img.onload = () => {
+        document.getElementById('message').innerHTML = `Now exploring <strong>${a.name}</strong><br>Click squares to discover different climate bands!`;
+    };
+    img.onerror = () => {
+        document.getElementById('message').innerHTML = `Failed to load map for ${a.name}. Check console for details (likely API key or network issue).`;
+        console.error('Map load failed. URL was:', url);
+    };
+
+    document.getElementById('message').innerHTML = `Loading ${a.name}...`;
 }
 
 // Load first area automatically
