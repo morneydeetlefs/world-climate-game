@@ -286,11 +286,26 @@ function updateTransform() {
 }
 
 function clampPan() {
+    // How much of the map (in normalized 0–1 terms) must remain visible
+    // 0.01 = allow panning until ~1% of the map is still in view
+    const minVisibleFraction = 0.001;
+
+    // Effective visible size in original map pixels
     const visibleW = vbWidth  / zoom;
     const visibleH = vbHeight / zoom;
 
-    panX = Math.min(0, Math.max(panX, vbWidth  - visibleW));
-    panY = Math.min(0, Math.max(panY, vbHeight - visibleH));
+    // The map's "movable range" in pan coordinates
+    // We allow the visible window to move almost completely off the map,
+    // but keep at least minVisibleFraction overlapping
+    const minPanX = visibleW * (minVisibleFraction - 1);   // very negative
+    const maxPanX = 0;                                      // can't pan right of origin
+
+    const minPanY = visibleH * (minVisibleFraction - 1);
+    const maxPanY = 0;
+
+    // Clamp panX / panY
+    panX = Math.max(minPanX, Math.min(maxPanX, panX));
+    panY = Math.max(minPanY, Math.min(maxPanY, panY));
 
     updateTransform();
 }
