@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Climate Quest – Fog of War Explorer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background: #0d1117;
+            font-family: Arial, sans-serif;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+        #controls {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 30;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 439px;
+            border: 2px solid #ffffff;
+            overflow: hidden;
+        }
+        #map-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            will-change: transform;
+        }
+        #map-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .zone {
+            position: absolute;
+            width: calc(100% / 3);
+            height: calc(100% / 3);
+            box-sizing: border-box;
+            border: 2px solid rgba(0, 0, 0, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .cloud {
+            background-color: rgba(200, 200, 200, 0.6);
+            background-image: url('https://opengameart.org/sites/default/files/FogofWar_0.png');
+            background-repeat: repeat;
+            background-size: 180px 180px;
+            opacity: 0.85;
+        }
+        .revealed {
+            background: transparent !important;
+            border-color: #00ff88 !important;
+            border-width: 4px !important;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+        }
+        #info {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 20;
+        }
+        #message {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 20;
+        }
+        #reset {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 8px 16px;
+            background: #ffcc66;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 20;
+        }
+        #reset:hover {
+            background: #ffdd88;
+        }
+        #game-container {
+            cursor: grab;
+        }
+        #game-container:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <label for="area-select"><strong>Choose Climate Realm:</strong></label>
+    <select id="area-select" style="padding:6px 10px; border-radius:4px; background:#222; color:#fff;">
+        <!-- populated by JS -->
+    </select>
+    <button id="load-btn" style="padding:6px 16px; background:#ffcc66; color:#000; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Load Area →</button>
+</div>
+
+<div id="game-container">
+    <div id="map-wrapper">
+        <img id="map-image" src="" alt="Climate Map">
+    </div>
+    <div id="info">
+        Score: <span id="score">0</span> | Zones Revealed: <span id="revealed-count">0</span>/9
+    </div>
+    <div id="message">Select an area above and explore its climate zones!</div>
+    <button id="reset">Reset Quest</button>
+</div>
+
+<script>
+const apiKey = 'a5e9ca232c20428aa54718f206e606d7';   // ← CHANGE THIS ONLY ONCE
+
+const areas = [
+    { name: "Big Island, Hawaiʻi (10 zones)", lat: 19.60, lng: -155.50, zoom: 9 },
+    { name: "Chimborazo, Ecuador (10–12 zones)", lat: -1.47, lng: -78.82, zoom: 12 },
+    { name: "Réunion Island (9–12 microclimates)", lat: -21.13, lng: 55.54, zoom: 10 },
+    { name: "Mount Cameroon (8–10 zones)", lat: 4.22, lng: 9.17, zoom: 11 },
+    { name: "Mount Kenya (8–9 zones)", lat: -0.15, lng: 37.30, zoom: 11 }
+];
+
+const select = document.getElementById('area-select');
+areas.forEach((a,i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = a.name;
+    select.appendChild(opt);
+});
+
+function loadArea(idx) {
+    const a = areas[idx];
+    const url = `https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=800&height=439&center=lonlat:\( {a.lng}, \){a.lat}&zoom=\( {a.zoom}&apiKey= \){apiKey}`;
+    document.getElementById('map-image').src = url;
+    document.getElementById('message').innerHTML = `Now exploring <strong>${a.name}</strong><br>Click squares to discover different climate bands!`;
+}
+
+// Load first area automatically
+loadArea(0);
+
+document.getElementById('load-btn').addEventListener('click', () => {
+    loadArea(select.value);
+    initGame();   // optional: reset fog-of-war when changing map
+});
+
+const container = document.getElementById('game-container');
+const mapWrapper = document.getElementById('map-wrapper');
+const scoreEl = document.getElementById('score');
+const revealedCountEl = document.getElementById('revealed-count');
+const messageEl = document.getElementById('message');
+const resetBtn = document.getElementById('reset');
+
+let score = 0;
+let revealedCount = 0;
+const totalZones = 9;
+let revealed = [];
+let zones = [];
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+let isDragging = false;
+let wasDragged = false;
+let lastClientX = 0;
+let lastClientY = 0;
+let dragStartX = 0;
+let dragStartY = 0;
+
+const vbWidth = 800;
+const vbHeight = 439;
+const winThreshold = 30;
+
+const events = [
+    { text: 'Found ancient San rock art! +10 points', points: 10 },
+    { text: "Dassies scamper by. Adorable! +2 points", points: 2 },
+    { text: 'Sudden mist engulfs you. -3 points', points: -3 },
+    { text: 'Breathtaking 360° panorama! +7 points', points: 7 },
+    { text: 'Rare proteas in bloom. +4 points', points: 4 },
+    { text: 'Slippery rocks – watch your step! -5 points', points: -5 },
+    { text: 'Secret fynbos trail discovered. +6 points', points: 6 },
+    { text: 'Echoes of cable car in distance. +3 points', points: 3 }
+];
+
+function initGame() {
+    score = 0;
+    revealedCount = 0;
+    revealed = new Array(totalZones).fill(false);
+    zones.forEach(zone => zone.remove());
+    zones = [];
+    // Create 3x3 grid
+    for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+            const zone = document.createElement('div');
+            zone.classList.add('zone', 'cloud');
+            zone.style.left = `${col * (100 / 3)}%`;
+            zone.style.top = `${row * (100 / 3)}%`;
+            zone.dataset.idx = zones.length;
+            zones.push(zone);
+            mapWrapper.appendChild(zone);
+        }
+    }
+    // Auto-reveal center (index 4)
+    exploreZone(4, true);
+    panX = 0;
+    panY = 0;
+    zoom = 1;
+    updateTransform();
+    clampPan();
+    updateUI();
+    messageEl.innerHTML = 'Center zone revealed. Click squares to explore! Drag to pan, wheel to zoom.';
+}
+
+function exploreZone(idx, silent = false) {
+    if (revealed[idx]) return;
+    revealed[idx] = true;
+    const zone = zones[idx];
+    zone.classList.remove('cloud');
+    zone.classList.add('revealed');
+    revealedCount++;
+    updateUI();
+    if (!silent) {
+        const event = events[Math.floor(Math.random() * events.length)];
+        score += event.points;
+        let msg = event.text;
+        if (score < 0) {
+            msg += ' | Game Over: Lost in the mist!';
+        } else if (revealedCount === totalZones) {
+            if (score >= winThreshold) {
+                msg += `<br><strong>Victory! Table Mountain Master Explorer!</strong>`;
+            } else {
+                msg += `<br>Map fully explored, but score low. Try again!`;
+            }
+        }
+        messageEl.innerHTML = msg;
+        updateUI();
+    }
+}
+
+function updateUI() {
+    scoreEl.textContent = score;
+    revealedCountEl.textContent = `\( {revealedCount}/ \){totalZones}`;
+}
+
+function updateTransform() {
+    mapWrapper.style.transform = `translate(${panX}px, \( {panY}px) scale( \){zoom})`;
+}
+
+function clampPan() {
+    panX = Math.max(vbWidth * (1 - zoom), Math.min(panX, 0));
+    panY = Math.max(vbHeight * (1 - zoom), Math.min(panY, 0));
+    updateTransform();
+}
+
+// Event listeners
+container.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    const viewX = (e.clientX - rect.left) / rect.width * vbWidth;
+    const viewY = (e.clientY - rect.top) / rect.height * vbHeight;
+    const zoomFactor = e.deltaY > 0 ? 0.85 : 1.18;
+    let newZoom = zoom * zoomFactor;
+    newZoom = Math.max(0.4, Math.min(4.5, newZoom));
+    const factor = newZoom / zoom;
+    panX = viewX * (1 - factor) + panX * factor;
+    panY = viewY * (1 - factor) + panY * factor;
+    zoom = newZoom;
+    updateTransform();
+    clampPan();
+}, { passive: false });
+
+container.addEventListener('mousedown', (e) => {
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    lastClientX = e.clientX;
+    lastClientY = e.clientY;
+    isDragging = false;
+    wasDragged = false;
+    container.style.cursor = 'grabbing';
+});
+
+container.addEventListener('mousemove', (e) => {
+    const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+    if (dist < 4) return;
+    if (!isDragging) {
+        isDragging = true;
+        wasDragged = true;
+        lastClientX = dragStartX;
+        lastClientY = dragStartY;
+    }
+    if (!isDragging) return;
+    const dx = (e.clientX - lastClientX) / zoom;
+    const dy = (e.clientY - lastClientY) / zoom;
+    panX += dx;
+    panY += dy;
+    lastClientX = e.clientX;
+    lastClientY = e.clientY;
+    updateTransform();
+    clampPan();
+});
+
+container.addEventListener('mouseup', () => {
+    isDragging = false;
+    container.style.cursor = 'grab';
+});
+
+container.addEventListener('mouseleave', () => {
+    isDragging = false;
+    container.style.cursor = 'grab';
+});
+
+container.addEventListener('click', (e) => {
+    if (wasDragged) {
+        wasDragged = false;
+        return;
+    }
+    if (e.target.classList.contains('zone')) {
+        const idx = parseInt(e.target.dataset.idx);
+        exploreZone(idx);
+    }
+});
+
+resetBtn.addEventListener('click', initGame);
+
+// Start game
+initGame();
+</script>
+</body>
+</html>
