@@ -282,24 +282,15 @@ function updateUI() {
 }
 
 function updateTransform() {
-    mapWrapper.style.transform = `translate(${panX}px, \( {panY}px) scale( \){zoom})`;
+    mapWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
 }
 
 function clampPan() {
-    // The visible area in "map pixels" after scaling
-    const visibleWidth  = vbWidth  / zoom;
-    const visibleHeight = vbHeight / zoom;
+    const visibleW = vbWidth  / zoom;
+    const visibleH = vbHeight / zoom;
 
-    // Max pan (most negative) = when right/bottom edge of map aligns with right/bottom of viewport
-    const maxPanX = 0;                     // left edge can't go right of viewport left
-    const minPanX = vbWidth - visibleWidth;   // right edge can't go left of viewport right
-
-    const maxPanY = 0;
-    const minPanY = vbHeight - visibleHeight;
-
-    // Apply clamps (note: panX/panY are usually ≤ 0)
-    panX = Math.min(maxPanX, Math.max(panX, minPanX));
-    panY = Math.min(maxPanY, Math.max(panY, minPanY));
+    panX = Math.min(0, Math.max(panX, vbWidth  - visibleW));
+    panY = Math.min(0, Math.max(panY, vbHeight - visibleH));
 
     updateTransform();
 }
